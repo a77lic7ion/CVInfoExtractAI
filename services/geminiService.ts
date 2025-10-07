@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import mammoth from 'mammoth';
 import type { ExtractedCVData } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -65,15 +66,30 @@ const responseSchema = {
 export const extractCVInfo = async (
   file: File
 ): Promise<ExtractedCVData> => {
-  try {
-    const base64Data = await fileToBase64(file);
+  const fileName = file.name.toLowerCase();
+  if (file.type === 'application/msword' || fileName.endsWith('.doc')) {
+    throw new Error("The classic .doc format is not supported as it is a legacy format. Please re-save the file as a .docx or PDF for best results.");
+  }
 
-    const filePart = {
-      inlineData: {
-        mimeType: file.type,
-        data: base64Data,
-      },
-    };
+  try {
+    const model = "gemini-2.5-flash";
+    const parts: any[] = [];
+
+    const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx');
+
+    if (isDocx) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      parts.push({ text: result.value });
+    } else {
+      const base64Data = await fileToBase64(file);
+      parts.push({
+        inlineData: {
+          mimeType: file.type,
+          data: base64Data,
+        },
+      });
+    }
 
     const prompt = `You are an expert HR assistant. Your task is to analyze the provided CV document (which could be an image, PDF, or text document) and extract specific information into a structured JSON format. Be as accurate as possible. Follow the provided schema precisely.
 
@@ -82,10 +98,12 @@ export const extractCVInfo = async (
 - Extract all work history and qualifications.
 - If information like salary or notice period isn't available, use a sensible default as described in the schema.
 - Format durations exactly as they appear in the CV.`;
+    
+    parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: { parts: [filePart, { text: prompt }] },
+      model: model,
+      contents: { parts: parts },
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
@@ -98,6 +116,9 @@ export const extractCVInfo = async (
     return parsedData as ExtractedCVData;
   } catch (error) {
     console.error("Error extracting CV info:", error);
+    if (error instanceof Error && error.message.includes(".doc format is not supported")) {
+        throw error;
+    }
     throw new Error("Failed to extract information from the CV. Please check the console for details.");
   }
 };
