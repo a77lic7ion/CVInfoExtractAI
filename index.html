@@ -1,9 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-g" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CV Information Extractor</title>
+    <script>
+      // Immediately sets the theme to avoid FOUC (Flash of Unstyled Content)
+      // and to ensure the class is present before React hydrates.
+      try {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {
+        // Local storage is not available
+      }
+    </script>
     <script>
       // Configure Tailwind to use the 'class' strategy for dark mode
       tailwind.config = {

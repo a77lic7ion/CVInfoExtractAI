@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { extractCVInfo } from './services/geminiService';
 import type { ExtractedCVData } from './types';
 import ResultDisplay from './components/ResultDisplay';
@@ -9,16 +9,19 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize theme from localStorage or system preference
+  // Initialize theme from localStorage or default to light mode
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const storedTheme = window.localStorage.getItem('theme');
+      // Use stored theme if it exists and is valid
       if (storedTheme === 'dark' || storedTheme === 'light') {
         return storedTheme;
       }
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    // Default to 'light' theme if no preference is stored
+    return 'light';
   });
 
   // Apply theme class to the document and persist in localStorage
@@ -62,10 +65,9 @@ const App: React.FC = () => {
     setError(null);
     setIsLoading(false);
     setFileName('');
-    // This is needed to clear the file input value
-    const fileInput = document.getElementById('cv-upload') as HTMLInputElement;
-    if (fileInput) {
-        fileInput.value = '';
+    // Use the ref to reset the file input's value
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
     }
   };
 
@@ -108,7 +110,7 @@ const App: React.FC = () => {
                 <p className="mb-2 text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">DOCX, PDF, PNG, JPG</p>
               </div>
-              <input id="cv-upload" type="file" className="hidden" onChange={handleFileChange} accept=".docx,.pdf,.png,.jpeg,.jpg" />
+              <input ref={fileInputRef} id="cv-upload" type="file" className="hidden" onChange={handleFileChange} accept=".docx,.pdf,.png,.jpeg,.jpg" />
             </label>
           </div>
         )}
