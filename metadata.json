@@ -1,0 +1,5 @@
+{
+  "name": "CV Information Extractor",
+  "description": "An application to upload a CV, extract key information using Gemini, and populate a standardized candidate profile summary.",
+  "requestFramePermissions": []
+}
