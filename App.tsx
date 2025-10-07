@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { extractCVInfo } from './services/geminiService';
 import type { ExtractedCVData } from './types';
 import ResultDisplay from './components/ResultDisplay';
-import Loader from './components/Loader';
+import ProgressBar from './components/ProgressBar';
 
 const App: React.FC = () => {
   const [extractedData, setExtractedData] = useState<ExtractedCVData | null>(null);
@@ -13,26 +13,20 @@ const App: React.FC = () => {
 
   // Initialize theme from localStorage or default to light mode
   const [theme, setTheme] = useState(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const storedTheme = window.localStorage.getItem('theme');
-      // Use stored theme if it exists and is valid
-      if (storedTheme === 'dark' || storedTheme === 'light') {
-        return storedTheme;
-      }
-    }
-    // Default to 'light' theme if no preference is stored
-    return 'light';
+    // Check for theme in localStorage, default to 'light'
+    return localStorage.getItem('theme') || 'light';
   });
 
   // Apply theme class to the document and persist in localStorage
   useEffect(() => {
+    const root = document.documentElement;
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
     }
     try {
-      window.localStorage.setItem('theme', theme);
+      localStorage.setItem('theme', theme);
     } catch (e) {
       console.error('Failed to save theme to localStorage', e);
     }
@@ -45,6 +39,16 @@ const App: React.FC = () => {
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Client-side validation for file size (15MB limit)
+      if (file.size > 15 * 1024 * 1024) {
+          setError('File size cannot exceed 15MB.');
+          // Reset file input
+          if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+          }
+          return;
+      }
+
       setFileName(file.name);
       setIsLoading(true);
       setError(null);
@@ -98,7 +102,7 @@ const App: React.FC = () => {
             CV Extractor
           </h1>
           <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
-            Upload a CV (.docx, .pdf, .png, .jpeg) to automatically extract key information.
+            Upload a CV to automatically extract key information.
           </p>
         </header>
 
@@ -108,20 +112,20 @@ const App: React.FC = () => {
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 <svg className="w-10 h-10 mb-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 <p className="mb-2 text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">DOCX, PDF, PNG, JPG</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">DOCX, PDF, PNG, JPG (Max 15MB)</p>
               </div>
               <input ref={fileInputRef} id="cv-upload" type="file" className="hidden" onChange={handleFileChange} accept=".docx,.pdf,.png,.jpeg,.jpg" />
             </label>
           </div>
         )}
         
-        {fileName && !extractedData && (
+        {fileName && !extractedData && !isLoading && (
           <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
             Uploaded file: {fileName}
           </p>
         )}
 
-        {isLoading && <Loader />}
+        {isLoading && <ProgressBar />}
 
         {error && (
           <div className="mt-8 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg relative text-left" role="alert">

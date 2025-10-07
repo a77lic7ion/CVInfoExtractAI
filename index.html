@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-g" />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CV Information Extractor</title>
     <script>
@@ -16,13 +16,26 @@
         // Local storage is not available
       }
     </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Configure Tailwind to use the 'class' strategy for dark mode
+      // Configure Tailwind to use the 'class' strategy for dark mode and extend with custom animations
       tailwind.config = {
         darkMode: 'class',
+        theme: {
+          extend: {
+            keyframes: {
+              'indeterminate-progress': {
+                '0%': { transform: ' translateX(-50%)' },
+                '100%': { transform: ' translateX(100%)' },
+              }
+            },
+            animation: {
+              'indeterminate-progress': 'indeterminate-progress 1.5s ease-in-out infinite',
+            }
+          }
+        }
       }
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
   <script type="importmap">
 {
   "imports": {
