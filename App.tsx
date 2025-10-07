@@ -1,237 +1,144 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { extractCVInfo } from './services/geminiService';
 import type { ExtractedCVData } from './types';
-import Loader from './components/Loader';
 import ResultDisplay from './components/ResultDisplay';
-
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+import Loader from './components/Loader';
 
 const App: React.FC = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [extractedData, setExtractedData] = useState<ExtractedCVData | null>(
-    null
-  );
+  const [extractedData, setExtractedData] = useState<ExtractedCVData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<boolean>(false);
-  const [isDocFile, setIsDocFile] = useState<boolean>(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [fileName, setFileName] = useState<string>('');
 
+  // Initialize theme from localStorage or system preference
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const storedTheme = window.localStorage.getItem('theme');
+      if (storedTheme === 'dark' || storedTheme === 'light') {
+        return storedTheme;
+      }
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  // Apply theme class to the document and persist in localStorage
   useEffect(() => {
-    if (isDarkMode) {
+    if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
-
-
-  const handleFileChange = (selectedFile: File | null) => {
-    if (selectedFile) {
-      if (selectedFile.size > MAX_FILE_SIZE) {
-        setError('File is too large. Please select a file smaller than 15MB.');
-        setFile(null);
-        setIsDocFile(false);
-        setExtractedData(null);
-        return;
-      }
-
-      const fileType = selectedFile.type;
-      const fileName = selectedFile.name.toLowerCase();
-
-      const isImage = fileType.startsWith('image/');
-      const isPdf = fileType === 'application/pdf';
-      const isText = fileType === 'text/plain' || fileName.endsWith('.txt');
-      const isDocx =
-        fileType ===
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        fileName.endsWith('.docx');
-      const isDoc =
-        fileType === 'application/msword' || fileName.endsWith('.doc');
-
-      if (isDoc) {
-        setIsDocFile(true);
-        setError(
-          "Legacy .doc file detected. Please open it in MS Word or Google Docs, 'Save As' a .docx or PDF, and upload the new file."
-        );
-        setFile(selectedFile);
-        setExtractedData(null);
-      } else if (isImage || isPdf || isText || isDocx) {
-        setIsDocFile(false);
-        setFile(selectedFile);
-        setError(null);
-        setExtractedData(null);
-      } else {
-        setIsDocFile(false);
-        setError(
-          'Please upload a valid file format (JPG, PNG, PDF, DOCX, TXT).'
-        );
-        setFile(null);
-      }
-    }
-  };
-
-  const handleDragEvents = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragOver(true);
-    } else if (e.type === 'dragleave') {
-      setDragOver(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChange(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleExtract = useCallback(async () => {
-    if (!file) {
-      setError('Please select a CV file first.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setExtractedData(null);
-
     try {
-      const data = await extractCVInfo(file);
-      setExtractedData(data);
-    } catch (err: any) {
-      setError(err.message || 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
+      window.localStorage.setItem('theme', theme);
+    } catch (e) {
+      console.error('Failed to save theme to localStorage', e);
     }
-  }, [file]);
+  }, [theme]);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(prevMode => !prevMode);
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
 
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      setIsLoading(true);
+      setError(null);
+      setExtractedData(null);
+      try {
+        const data = await extractCVInfo(file);
+        setExtractedData(data);
+      } catch (err: any) {
+        setError(err.message || 'An unknown error occurred.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+  
+  const handleReset = () => {
+    setExtractedData(null);
+    setError(null);
+    setIsLoading(false);
+    setFileName('');
+    // This is needed to clear the file input value
+    const fileInput = document.getElementById('cv-upload') as HTMLInputElement;
+    if (fileInput) {
+        fileInput.value = '';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 flex flex-col items-center py-10 px-4">
-       <div className="w-full max-w-4xl mx-auto flex justify-end mb-4">
+    <div className="relative bg-slate-50 dark:bg-slate-900 min-h-screen flex flex-col items-center justify-center p-4 font-sans text-slate-800 dark:text-slate-200 transition-colors duration-300">
+      
+      <div className="absolute top-4 right-4 z-10">
         <button
-          onClick={toggleDarkMode}
-          className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-slate-900"
-          aria-label="Toggle Dark Mode"
+          onClick={toggleTheme}
+          className="p-2 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 focus:ring-indigo-500"
+          aria-label="Toggle theme"
         >
-          {isDarkMode ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          {theme === 'light' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
             </svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           )}
         </button>
       </div>
-      <div className="w-full max-w-4xl mx-auto text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-slate-100 mb-2">
-          CV Information Extractor
-        </h1>
-        <p className="text-lg text-slate-600 dark:text-slate-400 mb-8">
-          Upload a CV file to automatically generate a standardized candidate
-          profile.
-        </p>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 md:p-8">
-          <div
-            onDragEnter={handleDragEvents}
-            onDragOver={handleDragEvents}
-            onDragLeave={handleDragEvents}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 transition-colors duration-200 ${
-              dragOver ? 'border-indigo-600 bg-indigo-50 dark:bg-slate-700' : 'border-slate-300 dark:border-slate-600'
-            }`}
-          >
-            <input
-              type="file"
-              id="file-upload"
-              className="hidden"
-              accept="image/*,.pdf,.doc,.docx,.txt"
-              onChange={(e) =>
-                handleFileChange(e.target.files ? e.target.files[0] : null)
-              }
-            />
-            <label
-              htmlFor="file-upload"
-              className="cursor-pointer flex flex-col items-center"
-            >
-              <svg
-                className="w-12 h-12 text-slate-400 dark:text-slate-500 mb-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"
-                ></path>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 16v-4m0 0l-2 2m2-2l2 2m-8-4h12"
-                ></path>
-              </svg>
-              <p className="text-slate-600 dark:text-slate-300 font-semibold">
-                <span className="text-indigo-600 dark:text-indigo-400">Click to upload</span> or drag
-                and drop
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                PNG, JPG, PDF, DOC, DOCX, TXT up to 15MB
-              </p>
+      <div className="w-full max-w-4xl mx-auto text-center">
+        <header className="mb-8">
+          <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white sm:text-5xl md:text-6xl">
+            CV Extractor
+          </h1>
+          <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
+            Upload a CV (.docx, .pdf, .png, .jpeg) to automatically extract key information.
+          </p>
+        </header>
+
+        {!extractedData && !isLoading && (
+          <div className="flex items-center justify-center w-full">
+            <label htmlFor="cv-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-indigo-300 border-dashed rounded-lg cursor-pointer bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <svg className="w-10 h-10 mb-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <p className="mb-2 text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">DOCX, PDF, PNG, JPG</p>
+              </div>
+              <input id="cv-upload" type="file" className="hidden" onChange={handleFileChange} accept=".docx,.pdf,.png,.jpeg,.jpg" />
             </label>
           </div>
-
-          {file && (
-            <div className="mt-4 text-center text-sm text-slate-700 dark:text-slate-300">
-              <p>
-                Selected file: <span className="font-medium">{file.name}</span>
-              </p>
-            </div>
-          )}
-
-          <button
-            onClick={handleExtract}
-            disabled={!file || isLoading || isDocFile}
-            className="mt-6 w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            {isLoading ? 'Extracting...' : 'Extract Information'}
-          </button>
-        </div>
+        )}
+        
+        {fileName && !extractedData && (
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Uploaded file: {fileName}
+          </p>
+        )}
 
         {isLoading && <Loader />}
 
         {error && (
-          <div
-            className={`mt-8 w-full px-4 py-3 rounded-lg ${
-              isDocFile
-                ? 'bg-blue-100 dark:bg-blue-900/50 border border-blue-400 dark:border-blue-500/50 text-blue-800 dark:text-blue-300'
-                : 'bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-300'
-            }`}
-            role="alert"
-          >
-            <strong className="font-bold">
-              {isDocFile ? 'Action Required:' : 'Error:'}{' '}
-            </strong>
-            <span className="block sm:inline">{error}</span>
+          <div className="mt-8 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg relative text-left" role="alert">
+            <strong className="font-bold">Error:</strong>
+            <span className="block sm:inline ml-2">{error}</span>
           </div>
         )}
 
-        {extractedData && <ResultDisplay data={extractedData} />}
+        {extractedData && (
+          <>
+            <ResultDisplay data={extractedData} />
+            <button
+              onClick={handleReset}
+              className="mt-8 px-6 py-2 text-sm font-medium rounded-md transition-colors duration-200 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 focus:ring-indigo-500"
+            >
+              Process Another CV
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

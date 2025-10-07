@@ -73,7 +73,17 @@ export const extractCVInfo = async (
 
   try {
     const model = "gemini-2.5-flash";
-    const parts: any[] = [];
+    
+    const prompt = `You are an expert HR assistant. Your task is to analyze the provided CV document (which could be an image, PDF, or text document) and extract specific information into a structured JSON format. Be as accurate as possible. Follow the provided schema precisely.
+
+- Calculate the candidate's age based on their Date of Birth (D.O.B) and the current year.
+- Determine if they have a driver's license and their own transport. For the user's template, we will assume they have their own transport if they have a license.
+- Extract all work history and qualifications.
+- If information like salary or notice period isn't available, use a sensible default as described in the schema.
+- Format durations exactly as they appear in the CV.`;
+    
+    // FIX: The prompt should be the first part of the request for better model performance.
+    const parts: any[] = [{ text: prompt }];
 
     const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx');
 
@@ -90,16 +100,6 @@ export const extractCVInfo = async (
         },
       });
     }
-
-    const prompt = `You are an expert HR assistant. Your task is to analyze the provided CV document (which could be an image, PDF, or text document) and extract specific information into a structured JSON format. Be as accurate as possible. Follow the provided schema precisely.
-
-- Calculate the candidate's age based on their Date of Birth (D.O.B) and the current year.
-- Determine if they have a driver's license and their own transport. For the user's template, we will assume they have their own transport if they have a license.
-- Extract all work history and qualifications.
-- If information like salary or notice period isn't available, use a sensible default as described in the schema.
-- Format durations exactly as they appear in the CV.`;
-    
-    parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
       model: model,

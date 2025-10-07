@@ -12,7 +12,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({ data }) => {
     const experienceSection = data.workHistory
       .map(
         (job) =>
-          `${job.duration}\n${job.company}\n${job.position}\n**Reason for leaving: ${job.reasonForLeaving}`
+          `${job.duration}\n${job.company}\n${job.position}\nReason for leaving: ${job.reasonForLeaving}`
       )
       .join('\n\n');
 
@@ -41,13 +41,9 @@ ${qualificationsSection}
 
 
 Notice Period:                       ${data.noticePeriod}
-
 Salary Requirement:            ${data.salaryRequirement}
-
 Age:                                       ${data.age}
-
 Driver's License:                    ${data.driversLicense ? 'Yes' : 'No'}
-
 Own transport:                      ${data.ownTransport ? 'Yes' : 'No'}
 
 
